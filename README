@@ -1,0 +1,16 @@
+Este script instala en una instalación de Ubuntu 14.04 :
+ - Apache2
+ - PHP
+ - MySQL
+ - Drush
+ - Git
+
+Y configura 2 virtualhost :
+ - drupal.local
+ - drupal-dev.local
+
+Y configura git:
+ - nombre / email
+ - default options
+
+Y genera la clave SSH para GitLab
