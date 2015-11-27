@@ -1,16 +1,9 @@
-Este script instala en una instalación de Ubuntu 14.04 :
- - Apache2
- - PHP
- - MySQL
- - Drush
- - Git
+This script sets up a LAMP dev environment on an ubuntu machine.
 
-Y configura 2 virtualhost :
- - drupal.local
- - drupal-dev.local
+It installs Apache2, PHP, MySQL, Drush (drupal component), Git, Postfix, SSH.
 
-Y configura git:
- - nombre / email
- - default options
+It configures also local domains and define virtualhost in apache2
 
-Y genera la clave SSH para GitLab
+It configures a relayhost in postfix
+
+It generates the SSH key
