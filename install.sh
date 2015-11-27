@@ -37,16 +37,19 @@ fi
 echo $'\n\n=== Apache2 Mods ==='
 read -p "Do you want to enable apache2 mods? (y/n)" -n 1 -r
 if [[ $REPLY =~ ^[Yy]$ ]]; then
+  echo ""
   echo "Enter the modules you want to enable (if you leave it empty, it will enable rewrite, actions and alias)"
   read -p "Module list (separate with spaces): " modulelist
   if [ "${modulelist}" == "" ]; then
     echo ""
     echo "Enabling default modules"
     sudo a2enmod rewrite actions alias
+    sudo service apache2 restart
   else
     echo ""
     echo "* Enabling $modulelist"
     sudo a2enmod $modulelist    
+    sudo service apache2 restart
   fi
 fi
 
@@ -65,7 +68,7 @@ fi
 echo ""
 echo $'\n\n=== Local domain setup & virtualhost ==='
 echo "Here you can setup a local domain (like mydev.local)"
-echo "and configure an Apache2 virtualhost that's point to it."
+echo "and configure an Apache2 virtualhost that points to it."
 echo " - It adds 1 line in /etc/hosts"
 echo " - It creates a directory in /var/www"
 echo " - It creates an apache config file in /etc/apache2/sites-available"
@@ -172,8 +175,10 @@ fi
 echo $'\n\n=== Git ==='
 read -p "Do you want to install git? (y/n)" -n 1 -r
 if [[ $REPLY =~ ^[Yy]$ ]]; then
+  echo ""
   echo "* Installing git"
   sudo apt-get install -y git
+  echo ""
   echo "* Configuring git"
   git config --global color.ui true
   git config --global color.status auto
@@ -192,12 +197,12 @@ fi
 if [ ! -f ~/.ssh/id_rsa.pub ]; then
   echo $'\n\n=== SSH Key ==='
   read -p "Do you want to create your SSH key (useful if you will use remote repository like github)? (y/n)" -n 1 -r
-  if [[ $REPLY =~ ^[Ss]$ ]]
+  if [[ $REPLY =~ ^[Yy]$ ]]
   then
     echo ""
-    echo "On the next question, leave all the default options - [Enter] in every question"
+    echo "Leave all the default options if you don't know what they mean"
     ssh-keygen -t rsa -C "$email"
-    echo "Your SSH key is: (useful for gitlab, github... :-):"
+    echo "Your SSH key is: (useful for gitlab, github... :-)"
     echo "----------- key start --------------------"
     cat ~/.ssh/id_rsa.pub
     echo "----------- key end ----------------------"
