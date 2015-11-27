@@ -32,8 +32,24 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
   # Configuring ServerName
   echo "ServerName localhost" | sudo tee /etc/apache2/conf-available/servername.conf
   sudo a2enconf servername
-  sudo a2enmod rewrite actions alias fastcgi
 fi
+
+echo $'\n\n=== Apache2 Mods ==='
+read -p "Do you want to enable apache2 mods? (y/n)" -n 1 -r
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+  echo "Enter the modules you want to enable (if you leave it empty, it will enable rewrite, actions and alias)"
+  read -p "Module list (separate with spaces): " modulelist
+  if [ "${modulelist}" == "" ]; then
+    echo ""
+    echo "Enabling default modules"
+    sudo a2enmod rewrite actions alias
+  else
+    echo ""
+    echo "* Enabling $modulelist"
+    sudo a2enmod $modulelist    
+  fi
+fi
+
 
 echo $'\n\n=== User permission ==='
 echo "if you add your user to the www-data group, it will be easier to"
