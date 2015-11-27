@@ -1,96 +1,165 @@
 #!/bin/bash
 
-# Instalacion de los paquetes de los servidores y bases de datos
-echo "*** INSTALANDO Apache2 + PHP + MySQL ***"
-sudo apt-get install -y apache2 php5-fpm php5-mysql php5-apcu apache2-mpm-event mysql-server php5-cli curl php5-gd libapache2-mod-php5
-# Configuring ServerName
-echo "*** CONFIGURANDO Apache2 + Hosts file ***"
-echo "ServerName localhost" | sudo tee /etc/apache2/conf-available/servername.conf
-sudo a2enconf servername
-sudo a2enmod rewrite actions alias fastcgi
-
-# Anyadimos el usuario actual al grupo www-data
-sudo usermod -a -G www-data $USER
-
-# Modificacion del archivo hosts
-cat /etc/hosts | head -n +1 > /tmp/hosts.tmp # Sacamos la primera linea
-echo "127.0.0.1   drupal.local" >> /tmp/hosts.tmp # Anyadimos las lineas que queremos
-echo "127.0.0.1   drupal-dev.local" >> /tmp/hosts.tmp
-cat /etc/hosts | tail -n +2 >> /tmp/hosts.tmp # Anyadimos las otras lineas del archivo original
-sudo mv /tmp/hosts.tmp /etc/hosts # Reemplazamos el archivo original
-
-# Creación de las carpetas en /var/www
-sudo mkdir /var/www/drupal
-sudo mkdir /var/www/drupal-dev
-
-# Definicion de los permisos
-sudo chown -R www-data:www-data /var/www/*
-sudo chmod 775 $(find /var/www -type d)
-sudo chmod 665 $(find /var/www -type f)
-
-# Instalación de los archivos de configuración de apache
-sudo cp ./drupal* /etc/apache2/sites-available/
-sudo a2ensite drupal.local.conf drupal-dev.local.conf
-sudo service apache2 restart
-
-# Creando Links en el escritorio
-desktop_dir=$(xdg-user-dir DESKTOP)
-ln -s /var/www/drupal $desktop_dir/drupal
-ln -s /var/www/drupal-dev $desktop_dir/drupal-dev
-
-# Instalación de drush
-echo "*** INSTALANDO Drush ***"
-cd ~
-curl -sS https://getcomposer.org/installer | php
-sed -i '1i export PATH="$HOME/.composer/vendor/bin:$PATH"' $HOME/.bashrc
-source $HOME/.bashrc
-php composer.phar global require drush/drush:6.*
-
-# Instalación del servidor email
-echo "*** INSTALANDO Postfix (servidor email para mandar correo con PHP y Drupal) ***"
-echo "A continuación elija la opción 'Sitio Internet' y deja el nombre por defecto"
-read -p "Pulsa [Enter] para continuar..."
-sudo apt-get install -y postfix
-# Añadido como relay del servidor smtp de la UPV
-sudo postconf -e 'relayhost=[smtp.upv.es]:25'
-
-# Instalación de GIT
-echo "*** INSTALANDO Git ***"
-sudo apt-get install -y git
-git config --global color.ui true
-git config --global color.status auto
-git config --global color.branch auto 
-git config --global core.editor nano
-git config --global push.default simple
-
-echo "Cual es su nombre ?"
-read nombre
-git config --global user.name "$nombre"
-echo "Cual es su email ?"
-read email
-git config --global user.email "$email"
-
-echo "*** Generando la clave SSH ***"
-read -p "Generamos la clave? (s/n) - Si ya tiene una, no hace falta generar una de nuevo" -n 1 -r
-
-if [[ $REPLY =~ ^[Ss]$ ]]
-then
-  echo ""
-  echo "Deja todos las opciones por defecto - [Enter] en cada pregunta"
-  ssh-keygen -t rsa -C "$email"
+if [[ $EUID -eq 0 ]]; then
+  echo "This script doesn't work properly if it used with root user." 1>&2
+  exit 1
 fi
 
-echo "*** Terminado !! ***"
-echo "Ya puede borrar la carpeta 'setup_drupal'"
-echo "http://drupal.local corresponde a /var/www/drupal"
-echo "http://drupal-dev.local corresponde a /var/www/drupal-dev"
-echo "Los links han sido creados en el escritorio"
-echo ""
-echo "Copia la siguiente clave en la interfaz de GitLab para poder utilizar git:"
-echo "----------- Inicio de la clave --------------------"
-cat ~/.ssh/id_rsa.pub
-echo "----------- Fin de la clave --------------------"
+echo "*************************************************"
+echo "This script will set a LAMP dev environment."
+echo "It comes with no warranty at all and has been tested only twice on Ubuntu 14.04"
+echo "It should work on all ubuntu variants and maybe on debian"
+echo "Use it at your own risk."
+echo "*************************************************"
+read -p "Press [Enter] to continue or Ctrl + C to exit..."
 
-echo "Una vez listo, reiniciamos el ordenador para terminar"
-read -p "Pulsa [Enter] para reiniciar..."
-sudo shutdown -r now
+# Install packages
+echo ""
+read -p "Do you want to install apache2 + PHP + MySQL packages? (y/n)" -n 1 -r
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+  echo "* Installing Apache2 + PHP + MySQL"
+  sudo apt-get install -y apache2 php5-fpm php5-mysql php5-apcu apache2-mpm-event mysql-server php5-cli curl php5-gd libapache2-mod-php5
+fi
+
+echo ""
+read -p "Do you want to configure apache2 ServerName? (y/n)" -n 1 -r
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+  echo "* Configuring Apache2 ServerName file"
+  # Configuring ServerName
+  echo "ServerName localhost" | sudo tee /etc/apache2/conf-available/servername.conf
+  sudo a2enconf servername
+  sudo a2enmod rewrite actions alias fastcgi
+fi
+
+echo ""
+read -p "Do you want to add your user to www-data group? (y/n)" -n 1 -r
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+  echo "* Adding $USER to www-data group"
+  # Adding user to www-data group
+  sudo usermod -a -G www-data $USER
+fi
+
+echo "* Local domain setup: this set up a local domain (like mydev.local, it must be a valid FQN) and configure an Apache2 virtualhost for it"
+while :
+do
+  echo ""
+  read -p "Do you want to setup a local domain? (y/n)" -n 1 -r
+  if [[ $REPLY =~ ^[Yy]$ ]]; then
+    echo ""
+    read -p "Enter the local domain (e.g. drupal.local):" localdomain
+    if [ "${localdomain}" == "" ]; then
+        echo "Error: empty local domain"
+    else
+      echo "* Modifying /etc/hosts"
+      cat /etc/hosts | head -n +1 > /tmp/hosts.tmp # We remove the first line
+      echo "127.0.0.1   $localdomain" >> /tmp/hosts.tmp # We add our line
+      cat /etc/hosts | tail -n +2 >> /tmp/hosts.tmp # We add the rest of the lines
+      sudo mv /tmp/hosts.tmp /etc/hosts # We replace the original file
+
+      # We get local folder (e.g. local domain is 
+      localfolder=$(echo $localdomain| cut -d'.' -f 1)
+      echo "* Creating /var/www/$localfolder and setting right permissions"
+      sudo mkdir /var/www/$localfolder
+      # Definicion de los permisos
+      sudo chown -R www-data:www-data /var/www/$localfolder
+      sudo chmod 770 /var/www/$localfolder
+
+      # Instalación de los archivos de configuración de apache
+      echo "* Configuring apache"
+      if [ ! -f ./default.local.conf ]; then
+        echo "Error! file default.local.conf NOT FOUND !"
+      else
+        sudo cp ./default.local.conf /tmp/$localdomain.conf
+        
+        # Editind conf file
+        sed -i 's/LOCALDOMAIN/$localdomain/g' /tmp/$localdomain.conf
+        sed -i 's/LOCALFOLDER/$localfolder/g' /tmp/$localdomain.conf
+        # Setting apache2 conf file
+        sudo mv /tmp/$localdomain.conf /etc/apache2/sites-available/
+        sudo a2ensite $localdomain.conf
+        sudo service apache2 restart
+      fi
+
+      # Creando Links en el escritorio
+      echo ""
+      read -p "Do you want to add a link to /var/www/$localfolder on your desktop? (y/n)" -n 1 -r
+      if [[ $REPLY =~ ^[Yy]$ ]]
+      then
+        echo "* Adding link"
+        desktop_dir=$(xdg-user-dir DESKTOP)
+        ln -s /var/www/$localfolder $desktop_dir/$localfolder
+      fi
+    fi
+  else
+    break
+  fi
+done
+
+# Drush install
+echo ""
+read -p "Do you want to install Drush? (y/n)" -n 1 -r
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+  echo "* Installing Drush"
+  cd ~
+  curl -sS https://getcomposer.org/installer | php
+  sed -i '1i export PATH="$HOME/.composer/vendor/bin:$PATH"' $HOME/.bashrc
+  source $HOME/.bashrc
+  php composer.phar global require drush/drush:6.*
+fi
+
+# Instalación del servidor email
+read -p "Do you want to install Postfix (mail server)? (y/n)" -n 1 -r
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+  echo "* Installing Postfix (mail server needed to send email through PHP)"
+  echo "On the next screen chose 'Internet Website' and leave the name by default"
+  echo "But if you know what you're doing "
+  read -p "Press [Enter] to continue..."
+  sudo apt-get install -y postfix
+  # Añadido como relay del servidor smtp de la UPV
+  read -p "Enter a relayhost if you want to set one and press [Enter]. Leave it empty if you don't. It must be like [smtp.example.com]:port (e.g. \"[smtp.upv.es]:25\") :" relayhost
+  if [ "${relayhost}" == "" ]; then
+      echo "No relayhost defined"
+  else
+    echo "* Setting $relayhost"
+  sudo postconf -e 'relayhost=$relayhost'
+fi
+
+# Instalación de GIT
+read -p "Do you want to install git? (y/n)" -n 1 -r
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+  echo "* Installing git"
+  sudo apt-get install -y git
+  echo "* Configuring git"
+  git config --global color.ui true
+  git config --global color.status auto
+  git config --global color.branch auto 
+  git config --global core.editor nano
+  git config --global push.default simple
+
+  echo "Git: enter your name: "
+  read nombre
+  git config --global user.name "$nombre"
+  echo "Git: enter your email address: "
+  read email
+  git config --global user.email "$email"
+fi
+
+if [ ! -f ~/.ssh/id_rsa.pub ]; then
+  read -p "Do you want to create your SSH key (useful if you will use remote repository like github)? (y/n)" -n 1 -r
+  if [[ $REPLY =~ ^[Ss]$ ]]
+  then
+    echo ""
+    echo "On the next question, leave all the default options - [Enter] in every question"
+    ssh-keygen -t rsa -C "$email"
+    echo "Your SSH key is the following (useful for gitlab, github... :-):"
+    echo "----------- key start --------------------"
+    cat ~/.ssh/id_rsa.pub
+    echo "----------- key end ----------------------"
+  fi
+else
+  echo "You already have a SSH key. It is the following (useful for gitlab, github... :-)"
+  echo "----------- key start --------------------"
+  cat ~/.ssh/id_rsa.pub
+  echo "----------- key end ----------------------"
+fi
+echo "*** Done !! ***"
