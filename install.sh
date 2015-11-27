@@ -14,16 +14,20 @@ echo "*************************************************"
 read -p "Press [Enter] to continue or Ctrl + C to exit..."
 
 # Install packages
-echo ""
+echo $'\n=== Installing LAMP packages ==='
 read -p "Do you want to install apache2 + PHP + MySQL packages? (y/n)" -n 1 -r
 if [[ $REPLY =~ ^[Yy]$ ]]; then
+  echo ""
   echo "* Installing Apache2 + PHP + MySQL"
   sudo apt-get install -y apache2 php5-fpm php5-mysql php5-apcu apache2-mpm-event mysql-server php5-cli curl php5-gd libapache2-mod-php5
 fi
 
-echo ""
+echo $'\n\n=== Apache2 FQDN ==='
+echo "Apache2 will complain about the FQDN not defined"
+echo "Here you can define the default ServerName"
 read -p "Do you want to configure apache2 ServerName? (y/n)" -n 1 -r
 if [[ $REPLY =~ ^[Yy]$ ]]; then
+  echo ""
   echo "* Configuring Apache2 ServerName file"
   # Configuring ServerName
   echo "ServerName localhost" | sudo tee /etc/apache2/conf-available/servername.conf
@@ -31,28 +35,41 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
   sudo a2enmod rewrite actions alias fastcgi
 fi
 
-echo ""
+echo $'\n\n=== User permission ==='
+echo "if you add your user to the www-data group, it will be easier to"
+echo "edit files in /var/www."
 read -p "Do you want to add your user to www-data group? (y/n)" -n 1 -r
 if [[ $REPLY =~ ^[Yy]$ ]]; then
+  echo ""
   echo "* Adding $USER to www-data group"
   # Adding user to www-data group
   sudo usermod -a -G www-data $USER
 fi
 
-echo "* Local domain setup: this set up a local domain (like mydev.local, it must be a valid FQN) and configure an Apache2 virtualhost for it"
+echo ""
+echo $'\n\n=== Local domain setup & virtualhost ==='
+echo "Here you can setup a local domain (like mydev.local)"
+echo "and configure an Apache2 virtualhost that's point to it."
+echo " - It adds 1 line in /etc/hosts"
+echo " - It creates a directory in /var/www"
+echo " - It creates an apache config file in /etc/apache2/sites-available"
+echo " - It enables the site with a2ensite"
+echo "You can define as many as you want, but be sure their names are unique."
 while :
 do
   echo ""
-  read -p "Do you want to setup a local domain? (y/n)" -n 1 -r
+  read -p "Do you want to setup a new local domain? (y/n)" -n 1 -r
   if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo ""
     read -p "Enter the local domain (e.g. drupal.local):" localdomain
     if [ "${localdomain}" == "" ]; then
+        echo ""
         echo "Error: empty local domain"
     else
+      echo ""
       echo "* Modifying /etc/hosts"
       cat /etc/hosts | head -n +1 > /tmp/hosts.tmp # We remove the first line
-      echo "127.0.0.1   $localdomain" >> /tmp/hosts.tmp # We add our line
+      echo "127.0.0.1	$localdomain" >> /tmp/hosts.tmp # We add our line
       cat /etc/hosts | tail -n +2 >> /tmp/hosts.tmp # We add the rest of the lines
       sudo mv /tmp/hosts.tmp /etc/hosts # We replace the original file
 
@@ -67,13 +84,14 @@ do
       # Instalación de los archivos de configuración de apache
       echo "* Configuring apache"
       if [ ! -f ./default.local.conf ]; then
+        echo ""
         echo "Error! file default.local.conf NOT FOUND !"
       else
         sudo cp ./default.local.conf /tmp/$localdomain.conf
         
         # Editind conf file
-        sed -i 's/LOCALDOMAIN/$localdomain/g' /tmp/$localdomain.conf
-        sed -i 's/LOCALFOLDER/$localfolder/g' /tmp/$localdomain.conf
+        sudo sed -i "s/LOCALDOMAIN/$localdomain/g" /tmp/$localdomain.conf
+        sudo sed -i "s/LOCALFOLDER/$localfolder/g" /tmp/$localdomain.conf
         # Setting apache2 conf file
         sudo mv /tmp/$localdomain.conf /etc/apache2/sites-available/
         sudo a2ensite $localdomain.conf
@@ -85,6 +103,7 @@ do
       read -p "Do you want to add a link to /var/www/$localfolder on your desktop? (y/n)" -n 1 -r
       if [[ $REPLY =~ ^[Yy]$ ]]
       then
+        echo ""
         echo "* Adding link"
         desktop_dir=$(xdg-user-dir DESKTOP)
         ln -s /var/www/$localfolder $desktop_dir/$localfolder
@@ -96,9 +115,10 @@ do
 done
 
 # Drush install
-echo ""
+echo $'\n\n=== Drush ==='
 read -p "Do you want to install Drush? (y/n)" -n 1 -r
 if [[ $REPLY =~ ^[Yy]$ ]]; then
+  echo ""
   echo "* Installing Drush"
   cd ~
   curl -sS https://getcomposer.org/installer | php
@@ -108,23 +128,32 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
 fi
 
 # Instalación del servidor email
+echo $'\n\n=== Postfix ==='
 read -p "Do you want to install Postfix (mail server)? (y/n)" -n 1 -r
 if [[ $REPLY =~ ^[Yy]$ ]]; then
+  echo ""
   echo "* Installing Postfix (mail server needed to send email through PHP)"
-  echo "On the next screen chose 'Internet Website' and leave the name by default"
-  echo "But if you know what you're doing "
+  echo "On the next screen chose 'Internet Website' and leave the name by default (or configure it as you want)"
   read -p "Press [Enter] to continue..."
   sudo apt-get install -y postfix
   # Añadido como relay del servidor smtp de la UPV
-  read -p "Enter a relayhost if you want to set one and press [Enter]. Leave it empty if you don't. It must be like [smtp.example.com]:port (e.g. \"[smtp.upv.es]:25\") :" relayhost
+  echo ""
+  echo "You can define a relayhost to send your emails through another smtp server."
+  echo "It must be like [smtp.example.com]:port (e.g. \"[smtp.upv.es]:25\")"
+  echo "Leave it empty if you don't want to define any."
+  read -p "Relayhost :" relayhost
   if [ "${relayhost}" == "" ]; then
-      echo "No relayhost defined"
+    echo ""
+    echo "No relayhost defined"
   else
+    echo ""
     echo "* Setting $relayhost"
-  sudo postconf -e 'relayhost=$relayhost'
+    sudo postconf -e 'relayhost=$relayhost'
+  fi
 fi
 
 # Instalación de GIT
+echo $'\n\n=== Git ==='
 read -p "Do you want to install git? (y/n)" -n 1 -r
 if [[ $REPLY =~ ^[Yy]$ ]]; then
   echo "* Installing git"
@@ -145,21 +174,25 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
 fi
 
 if [ ! -f ~/.ssh/id_rsa.pub ]; then
+  echo $'\n\n=== SSH Key ==='
   read -p "Do you want to create your SSH key (useful if you will use remote repository like github)? (y/n)" -n 1 -r
   if [[ $REPLY =~ ^[Ss]$ ]]
   then
     echo ""
     echo "On the next question, leave all the default options - [Enter] in every question"
     ssh-keygen -t rsa -C "$email"
-    echo "Your SSH key is the following (useful for gitlab, github... :-):"
+    echo "Your SSH key is: (useful for gitlab, github... :-):"
     echo "----------- key start --------------------"
     cat ~/.ssh/id_rsa.pub
     echo "----------- key end ----------------------"
   fi
 else
-  echo "You already have a SSH key. It is the following (useful for gitlab, github... :-)"
+  echo $'\n\n=== SSH Key ==='
+  echo "You already have a SSH key. Here it is (useful for gitlab, github... :-)"
   echo "----------- key start --------------------"
   cat ~/.ssh/id_rsa.pub
   echo "----------- key end ----------------------"
 fi
+echo ""
 echo "*** Done !! ***"
+echo ""
