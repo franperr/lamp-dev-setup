@@ -7,7 +7,7 @@ fi
 
 echo "*************************************************"
 echo "This script will set a LAMP dev environment."
-echo "It comes with no warranty at all and has been tested only twice on Ubuntu 14.04"
+echo "It comes with no warranty at all and has been tested only on Ubuntu 14.04 (server, gnome, xubuntu)."
 echo "It should work on all ubuntu variants and maybe on debian"
 echo "Use it at your own risk."
 echo "*************************************************"
