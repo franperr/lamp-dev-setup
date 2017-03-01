@@ -17,7 +17,7 @@ IT COMES WITH NO WARRANTY AT ALL, USE IT AT YOUR OWN RISK.
 Installation
 ====
 
-Run ./install.sh in a terminal as a normal user (with sudo privilege)
+Run ./install.sh in a terminal as a normal user (without sudo privilege)
 
 Uninstall
 ====
