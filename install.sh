@@ -15,11 +15,11 @@ read -p "Press [Enter] to continue or Ctrl + C to exit..."
 
 # Install packages
 echo $'\n=== Installing LAMP packages ==='
-read -p "Do you want to install apache2 + PHP + MySQL packages? (y/n)" -n 1 -r
+read -p "Do you want to install apache2 + PHP + MySQL (MariaDB) packages? (y/n)" -n 1 -r
 if [[ $REPLY =~ ^[Yy]$ ]]; then
   echo ""
   echo "* Installing Apache2 + PHP + MySQL"
-  sudo apt-get install -y apache2 php5-fpm php5-mysql php5-apcu apache2-mpm-event mysql-server php5-cli curl php5-gd libapache2-mod-php5
+  sudo apt-get install -y apache2 php-mysql php-apcu mariadb-server php-cli curl php-gd libapache2-mod-php
 fi
 
 echo $'\n\n=== Apache2 FQDN ==='
@@ -158,7 +158,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
   # Añadido como relay del servidor smtp de la UPV
   echo ""
   echo "You can define a relayhost to send your emails through another smtp server."
-  echo "It must be like [smtp.example.com]:port (e.g. \"[smtp.upv.es]:25\")"
+  echo "It must be like [smtp.example.com]:port (e.g. \"[smtp.example.com]:25\")"
   echo "Leave it empty if you don't want to define any."
   read -p "Relayhost :" relayhost
   if [ "${relayhost}" == "" ]; then
