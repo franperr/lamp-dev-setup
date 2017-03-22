@@ -1,7 +1,7 @@
 About
 ====
 
-This script sets up a LAMP dev environment on an ubuntu machine. It was first
+This script sets up a LAMP dev environment on an ubuntu machine (14.04 and 16.04). It was first
 created to setup a collaborative environment to work with drupal, but you can
 chose to only install some components. You can also use it to create 
 local domain, which is useful if you develop various project on a local 
